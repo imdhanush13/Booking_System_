@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Admin CheckList</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            text-align: center;
+            color: #222;
+            margin-bottom: 1.5rem;
+        }
+        .section {
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.75rem;
+            text-align: center;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        input, select {
+            padding: 0.5rem;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #a71d2a;
+        }
+        .flex-row {
+            display: flex;
+            gap: 1rem;
+        }
+        .flex-row > * {
+            flex: 1;
+        }
+        .message {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 1rem;
+            color: green;
+        }
+    </style>
+</head>
+<body background="images/img1.jpg">
+
+<h1>Admin Dashboard</h1>
+
+<div class="section">
+    <h2>Add / Update Service</h2>
+    <form id="service-form">
+        <input type="hidden" id="serviceId" />
+        <div class="flex-row">
+            <input type="text" id="name" placeholder="Service Name" required />
+            <input type="number" id="price" placeholder="Price" min="0" required />
+        </div>
+        <div class="flex-row">
+            <input type="date" id="date" required />
+            <input type="time" id="time" required />
+        </div>
+        <button type="submit">Save Service</button>
+        <button type="button" id="clear-btn" style="background:#6c757d; margin-left:10px;">Clear</button>
+    </form>
+    <div id="service-message" class="message"></div>
+</div>
+
+<div class="section">
+    <h2>Services List</h2>
+    <table id="services-table">
+        <thead>
+        <tr>
+            <th>ID</th><th>Name</th><th>Price</th><th>Date</th><th>Time</th><th>Actions</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>All Appointments</h2>
+    <table id="appointments-table">
+        <thead>
+        <tr><th>ID</th><th>Customer</th><th>Contact</th><th>Service</th><th>Date</th><th>Time</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+<script>
+    const serviceForm = document.getElementById('service-form');
+    const servicesTableBody = document.querySelector('#services-table tbody');
+    const appointmentsTableBody = document.querySelector('#appointments-table tbody');
+    const serviceMessage = document.getElementById('service-message');
+    const clearBtn = document.getElementById('clear-btn');
+
+    // Load services
+    async function loadServices() {
+        try {
+            const res = await fetch('/api/services');
+            const services = await res.json();
+            servicesTableBody.innerHTML = '';
+            services.forEach(service => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${service.id}</td>
+                    <td>${service.name}</td>
+                    <td>${service.price}</td>
+                    <td>${service.availableDate}</td>
+                    <td>${service.availableTime}</td>
+                    <td>
+                        <button onclick="editService(${service.id})">Edit</button>
+                        <button class="btn-danger" onclick="deleteService(${service.id})">Delete</button>
+                    </td>
+                `;
+                servicesTableBody.appendChild(tr);
+            });
+        } catch (err) {
+            alert('Failed to load services');
+        }
+    }
+
+    // Save or update service
+    serviceForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('serviceId').value;
+        const name = document.getElementById('name').value.trim();
+        const price = Number(document.getElementById('price').value);
+        const availableDate = document.getElementById('date').value;
+        const availableTime = document.getElementById('time').value;
+
+        if (!name || !price || !availableDate || !availableTime) {
+            serviceMessage.style.color = 'red';
+            serviceMessage.textContent = 'Please fill all fields.';
+            return;
+        }
+
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/services/${id}` : '/api/services';
+
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id, name, price, availableDate, availableTime })
+            });
+            if (!res.ok) throw new Error('Failed to save service');
+
+            serviceMessage.style.color = 'green';
+            serviceMessage.textContent = `Service ${id ? 'updated' : 'added'} successfully!`;
+            serviceForm.reset();
+            document.getElementById('serviceId').value = '';
+        } catch (err) {
+            serviceMessage.style.color = 'red';
+            serviceMessage.textContent = err.message;
+        }
+    });
+
+    // Clear form
+    clearBtn.addEventListener('click', () => {
+        serviceForm.reset();
+        document.getElementById('serviceId').value = '';
+        serviceMessage.textContent = '';
+    });
+
+    // Edit service
+    async function editService(id) {
+        try {
+            const res = await fetch(`/api/services`);
+            if (!res.ok) throw new Error('Service list not loaded');
+            const services = await res.json();
+            const service = services.find(s => s.id === id);
+            if (!service) throw new Error('Service not found');
+
+            document.getElementById('serviceId').value = service.id;
+            document.getElementById('name').value = service.name;
+            document.getElementById('price').value = service.price;
+            document.getElementById('date').value = service.availableDate;
+            document.getElementById('time').value = service.availableTime;
+            serviceMessage.textContent = '';
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function deleteService(id) {
+        if (!confirm('Are you sure you want to delete this service?')) return;
+        try {
+            const res = await fetch(`/api/services/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete service');
+            loadServices();
+            serviceMessage.style.color = 'green';
+            serviceMessage.textContent = 'Service deleted successfully';
+        } catch (err) {
+            serviceMessage.style.color = 'red';
+            serviceMessage.textContent = err.message;
+        }
+    }
+    async function loadAppointments() {
+        try {
+            const res = await fetch('/admin/appointments');
+            if (!res.ok) throw new Error('Failed to fetch appointments');
+
+            const appointments = await res.json();
+            appointmentsTableBody.innerHTML = ''; // Clear previous
+
+            if (appointments.length === 0) {
+                appointmentsTableBody.innerHTML = `<tr><td colspan="5">No appointments found.</td></tr>`;
+                return;
+            }
+
+            appointments.forEach(appointment => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${appointment.id}</td>
+          <td>${appointment.customerName}</td>
+          <td>${appointment.contact}</td>
+          <td>${appointment.bookedDate}</td>
+          <td>${appointment.bookedTime}</td>
+          <td>${appointment.service?.name || 'N/A'}</td>
+        `;
+                appointmentsTableBody.appendChild(tr);
+            });
+        } catch (error) {
+            alert('Failed to load appointments.');
+            console.error(error);
+        }
+    }
+
+
+    // Call this function when admin dashboard page loads
+    loadServices();
+    loadAppointments();
+</script>
+
+</body>
+</html>
